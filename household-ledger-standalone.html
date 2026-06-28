@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#1B2A41" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="mobile-web-app-capable" content="yes" />
+<title>가계부</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=Noto+Serif+KR:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+
+<style>
+  :root{
+    --ink:#1B2A41;
+    --ink-soft:#5C6B80;
+    --paper:#FAF8F3;
+    --paper-line:#E3DDCF;
+    --stamp:#B23A2E;
+    --stamp-dark:#8C2C22;
+    --cat-food:#B9791F;
+    --cat-education:#2C5AA0;
+    --cat-shopping:#8A3FA0;
+    --cat-travel:#1C7A6E;
+    --cat-transport:#51677A;
+    --cat-housing:#5C7A29;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:#EDE7DA;}
+  body{
+    font-family:'Pretendard Variable','Pretendard',-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    color:var(--ink);
+  }
+  #root{display:flex;justify-content:center;}
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    background:var(--paper);
+    box-shadow:0 1px 28px rgba(27,42,65,0.10);
+    padding:30px 20px 64px;
+    position:relative;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.2em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin-bottom:8px;
+  }
+  .date-header{
+    font-family:'Noto Serif KR',serif;
+    font-size:25px;
+    font-weight:700;
+    line-height:1.35;
+    color:var(--ink);
+    margin-bottom:16px;
+  }
+  .date-header.month-nav{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
+  .month-arrow{
+    background:none;
+    border:none;
+    font-family:'Noto Serif KR',serif;
+    font-size:22px;
+    color:var(--ink);
+    cursor:pointer;
+    padding:0 6px;
+    line-height:1;
+  }
+  .month-arrow:disabled{color:var(--paper-line);cursor:default;}
+  .rule{
+    width:52px;
+    height:3px;
+    background:var(--ink);
+    margin-bottom:24px;
+  }
+  .tab-row{display:flex;gap:8px;margin-bottom:22px;}
+  .tab{
+    flex:1;
+    padding:9px 0;
+    text-align:center;
+    border-radius:8px;
+    border:1.5px solid var(--paper-line);
+    background:transparent;
+    font-family:inherit;
+    font-size:13px;
+    font-weight:700;
+    color:var(--ink-soft);
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .tab.selected{background:var(--ink);border-color:var(--ink);color:var(--paper);}
+  .form{display:flex;flex-direction:column;gap:13px;margin-bottom:20px;}
+  .chip-row{display:flex;gap:8px;}
+  .chip{
+    padding:8px 15px;
+    border-radius:999px;
+    border:1.5px solid var(--paper-line);
+    background:transparent;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    font-weight:600;
+    color:var(--ink-soft);
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .chip.selected{background:var(--ink);border-color:var(--ink);color:var(--paper);}
+  .amount-input{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:30px;
+    font-weight:600;
+    color:var(--ink);
+    border:none;
+    border-bottom:2px solid var(--paper-line);
+    background:transparent;
+    padding:6px 2px;
+    outline:none;
+    width:100%;
+    transition:border-color .15s ease;
+  }
+  .amount-input::-webkit-outer-spin-button,
+  .amount-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+  .amount-input:focus{border-bottom-color:var(--stamp);}
+  .item-input{
+    font-family:inherit;
+    font-size:16px;
+    color:var(--ink);
+    border:none;
+    border-bottom:1.5px solid var(--paper-line);
+    background:transparent;
+    padding:10px 2px;
+    outline:none;
+    width:100%;
+    transition:border-color .15s ease;
+  }
+  .item-input:focus{border-bottom-color:var(--stamp);}
+  .cat-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px;}
+  .cat-chip{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:7px 13px;
+    border-radius:999px;
+    border:1.5px solid var(--paper-line);
+    background:transparent;
+    font-family:inherit;
+    font-size:13px;
+    font-weight:600;
+    color:var(--ink-soft);
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .cat-chip.selected{font-weight:700;}
+  .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;display:inline-block;}
+  .save-btn{
+    margin-top:6px;
+    padding:15px;
+    border:none;
+    border-radius:10px;
+    background:var(--stamp);
+    color:#FFF6EF;
+    font-family:'Noto Serif KR',serif;
+    font-size:16px;
+    font-weight:700;
+    letter-spacing:.02em;
+    cursor:pointer;
+    transition:background .15s ease, transform .1s ease;
+  }
+  .save-btn:active{transform:scale(0.98);background:var(--stamp-dark);}
+  .perf{
+    height:6px;
+    background-image:radial-gradient(circle, var(--paper-line) 1.6px, transparent 1.7px);
+    background-size:9px 6px;
+    background-repeat:repeat-x;
+    margin:18px 0;
+  }
+  .today-summary{
+    display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px;
+    min-height:20px;
+  }
+  .summary-label{
+    font-family:'Pretendard Variable','Pretendard',sans-serif;
+    font-size:12px;
+    color:var(--ink-soft);
+    letter-spacing:.03em;
+  }
+  .muted{color:var(--ink-soft);font-size:13px;font-family:'Pretendard Variable','Pretendard',sans-serif;}
+  .hint{
+    font-size:11px;
+    color:var(--ink-soft);
+    letter-spacing:.04em;
+    margin-bottom:6px;
+  }
+  .history{display:flex;flex-direction:column;}
+  .empty-state{
+    color:var(--ink-soft);
+    font-size:14px;
+    padding:26px 6px;
+    text-align:center;
+    line-height:1.7;
+  }
+  .day-group{margin-bottom:2px;}
+  .day-header{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:15px 4px 8px;
+    font-size:13px;
+    font-weight:700;
+    color:var(--ink);
+    border-top:1px solid var(--paper-line);
+  }
+  .day-totals{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    font-weight:500;
+    color:var(--ink-soft);
+    text-align:right;
+  }
+  .entry-row{
+    display:flex;align-items:center;gap:9px;
+    padding:10px 4px;
+    cursor:pointer;
+    border-radius:6px;
+    transition:background .12s ease;
+  }
+  .entry-row:hover, .entry-row:active{background:rgba(178,58,46,0.07);}
+  .entry-cat{
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.01em;
+    flex-shrink:0;
+    min-width:64px;
+  }
+  .entry-item{
+    flex:1;
+    font-size:14px;
+    color:var(--ink);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    min-width:0;
+  }
+  .entry-amount{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px;
+    font-weight:600;
+    color:var(--ink);
+    flex-shrink:0;
+  }
+  @keyframes stampIn{
+    from{opacity:0;transform:scale(.94) translateY(-3px);}
+    to{opacity:1;transform:scale(1) translateY(0);}
+  }
+  .stamp-in{animation:stampIn .22s ease-out;}
+  @media (prefers-reduced-motion: reduce){
+    .stamp-in{animation:none;}
+  }
+  .boot-error{
+    padding:40px 24px;
+    font-family:'Pretendard Variable','Pretendard',sans-serif;
+    color:var(--ink);
+    text-align:center;
+    line-height:1.7;
+  }
+  .stats{display:flex;flex-direction:column;gap:26px;}
+  .stats-sgd-total{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    flex-wrap:wrap;
+    gap:8px;
+    padding-bottom:14px;
+    border-bottom:1px dashed var(--paper-line);
+  }
+  .stats-sgd-amount{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:16px;
+    font-weight:700;
+    color:var(--stamp);
+  }
+  .stats-currency{display:flex;flex-direction:column;gap:11px;}
+  .stats-currency-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    border-bottom:1.5px solid var(--ink);
+    padding-bottom:8px;
+  }
+  .stats-currency-code{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px;
+    font-weight:700;
+    letter-spacing:.05em;
+    color:var(--ink-soft);
+  }
+  .stats-currency-total{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:20px;
+    font-weight:700;
+    color:var(--ink);
+  }
+  .stats-row{display:flex;align-items:center;gap:9px;}
+  .stats-cat-label{
+    font-size:13px;
+    font-weight:600;
+    color:var(--ink);
+    min-width:74px;
+    flex-shrink:0;
+  }
+  .stats-bar-track{
+    flex:1;
+    height:7px;
+    border-radius:4px;
+    background:var(--paper-line);
+    overflow:hidden;
+  }
+  .stats-bar-fill{display:block;height:100%;border-radius:4px;transition:width .25s ease;}
+  .stats-amount{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    font-weight:600;
+    color:var(--ink);
+    flex-shrink:0;
+    min-width:62px;
+    text-align:right;
+  }
+  .stats-pct{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    flex-shrink:0;
+    width:32px;
+    text-align:right;
+  }
+  .stats-note{
+    font-size:11px;
+    color:var(--ink-soft);
+    line-height:1.6;
+  }
+</style>
+</head>
+<body>
+<div id="root">
+  <div class="boot-error" id="boot-msg">불러오는 중…</div>
+</div>
+
+<script>
+function bootApp(){
+  var h = React.createElement;
+  var useState = React.useState;
+  var useEffect = React.useEffect;
+  var useMemo = React.useMemo;
+
+  var CATS = [
+    { key: 'food',       label: '식비',        color: 'var(--cat-food)' },
+    { key: 'education',  label: '교육비',      color: 'var(--cat-education)' },
+    { key: 'shopping',   label: '쇼핑/문화',   color: 'var(--cat-shopping)' },
+    { key: 'travel',     label: '여행',        color: 'var(--cat-travel)' },
+    { key: 'transport',  label: '교통비',      color: 'var(--cat-transport)' },
+    { key: 'housing',    label: '주거/관리비', color: 'var(--cat-housing)' }
+  ];
+  var CAT_BY_KEY = {};
+  CATS.forEach(function(c){ CAT_BY_KEY[c.key] = c; });
+
+  var CURRENCIES = [
+    { code: 'RM',  prefix: 'RM ', decimals: 2 },
+    { code: 'USD', prefix: '$',   decimals: 2 },
+    { code: 'SGD', prefix: 'S$',  decimals: 2 },
+    { code: 'KRW', prefix: '₩',   decimals: 0 }
+  ];
+
+  // rough reference-only conversion rates to SGD (not live, for ballpark totals only)
+  var FX_TO_SGD = { SGD: 1, RM: 0.317, USD: 1.29, KRW: 0.00084 };
+
+  var KEYWORDS = {
+    food: ['식당','카페','커피','커피숍','스타벅스','맥도날드','버거','치킨','분식','마트','슈퍼','편의점','배달','음식','점심','저녁','아침','간식','베이커리','빵집','야식','맥주','와인','호커','국수','김밥','떡볶이','피자','초밥','스시','hawker','mamak','kopitiam','restaurant','food','cafe','coffee','lunch','dinner','breakfast','snack','grocery','supermarket','bakery','mcd','kfc','starbucks','foodpanda','grabfood','makan','nasi','noodle'],
+    education: ['학원','과외','튜터','학비','등록금','교재','피겨','스케이팅','코치','미술','아트','파쿠르','수학','영어','레슨','수업','학교','iskl','tuition','school fee','school','tutor','lesson','coach','skating','math','english class','textbook','piano','swim class'],
+    shopping: ['쇼핑','옷','신발','가방','화장품','뷰티','영화','영화관','공연','전시','콘서트','넷플릭스','구독','백화점','면세점','미용실','헤어','shopping','clothes','shoes','bag','cosmetic','beauty','movie','cinema','netflix','spotify','subscription','mall','sephora','watsons','uniqlo','zara','salon'],
+    travel: ['항공','비행기','호텔','숙소','여행','휴가','에어비앤비','리조트','flight','airline','airasia','hotel','airbnb','travel','trip','vacation','resort'],
+    transport: ['택시','그랩','버스','지하철','기차','주유','기름','톨게이트','주차','패스','taxi','grab','bus','train','mrt','lrt','petrol','gas station','toll','parking','uber','gojek','touch n go','ezlink'],
+    housing: ['월세','관리비','전기세','전기','수도세','수도','가스비','인터넷','와이파이','통신비','핸드폰비','콘도','렌트','집세','rent','maintenance fee','condo fee','electric','electricity','water bill','internet','wifi','broadband','phone bill','utility']
+  };
+
+  function classify(text){
+    var t = text.toLowerCase();
+    var best = null, bestScore = 0;
+    Object.keys(KEYWORDS).forEach(function(cat){
+      var words = KEYWORDS[cat];
+      var score = 0;
+      words.forEach(function(w){ if (t.indexOf(w.toLowerCase()) !== -1) score++; });
+      if (score > bestScore){ bestScore = score; best = cat; }
+    });
+    return best || 'shopping';
+  }
+
+  function pad2(n){ return String(n).padStart(2,'0'); }
+  function dateKey(d){ return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()); }
+  function todayKey(){ return dateKey(new Date()); }
+  var WEEKDAYS = ['일','월','화','수','목','금','토'];
+  function formatHeader(d){
+    return d.getFullYear() + '년 ' + (d.getMonth()+1) + '월 ' + d.getDate() + '일 ' + WEEKDAYS[d.getDay()] + '요일';
+  }
+  function formatDayLabel(keyStr){
+    var d = new Date(keyStr + 'T00:00:00');
+    var tk = todayKey();
+    var yest = new Date(); yest.setDate(yest.getDate()-1);
+    var yk = dateKey(yest);
+    var base = (d.getMonth()+1) + '월 ' + d.getDate() + '일 (' + WEEKDAYS[d.getDay()] + ')';
+    if (keyStr === tk) return '오늘 · ' + base;
+    if (keyStr === yk) return '어제 · ' + base;
+    return base;
+  }
+  function formatAmount(code, amount){
+    var cfg = null;
+    for (var i=0;i<CURRENCIES.length;i++){ if (CURRENCIES[i].code===code){ cfg = CURRENCIES[i]; break; } }
+    if (!cfg) cfg = CURRENCIES[0];
+    var num = cfg.decimals === 0
+      ? Math.round(amount).toLocaleString('en-US')
+      : amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return cfg.prefix + num;
+  }
+
+  var LS_ENTRIES = 'gagyebu_entries_v1';
+  var LS_CURRENCY = 'gagyebu_last_currency_v1';
+  function loadEntries(){
+    try { return JSON.parse(localStorage.getItem(LS_ENTRIES)) || []; } catch(e){ return []; }
+  }
+
+  function App(){
+    var entriesState = useState(loadEntries); var entries = entriesState[0], setEntries = entriesState[1];
+    var currencyState = useState(function(){ return localStorage.getItem(LS_CURRENCY) || 'RM'; });
+    var currency = currencyState[0], setCurrency = currencyState[1];
+    var amountState = useState(''); var amount = amountState[0], setAmount = amountState[1];
+    var itemState = useState(''); var item = itemState[0], setItem = itemState[1];
+    var categoryState = useState('shopping'); var category = categoryState[0], setCategory = categoryState[1];
+    var manualCatState = useState(false); var manualCat = manualCatState[0], setManualCat = manualCatState[1];
+    var viewState = useState('ledger'); var view = viewState[0], setView = viewState[1];
+    var statsMonthState = useState(function(){
+      var d = new Date();
+      return { y: d.getFullYear(), m: d.getMonth() + 1 };
+    });
+    var statsMonth = statsMonthState[0], setStatsMonth = statsMonthState[1];
+
+    var today = new Date();
+    var tKey = todayKey();
+
+    function monthKeyOf(y, m){ return y + '-' + pad2(m); }
+    var curD = new Date();
+    var curMonthKey = monthKeyOf(curD.getFullYear(), curD.getMonth() + 1);
+    var statsMonthKey = monthKeyOf(statsMonth.y, statsMonth.m);
+    var isCurrentMonth = statsMonthKey === curMonthKey;
+
+    function prevMonth(){
+      setStatsMonth(function(s){
+        var m = s.m - 1, y = s.y;
+        if (m < 1) { m = 12; y -= 1; }
+        return { y: y, m: m };
+      });
+    }
+    function nextMonth(){
+      if (isCurrentMonth) return;
+      setStatsMonth(function(s){
+        var m = s.m + 1, y = s.y;
+        if (m > 12) { m = 1; y += 1; }
+        return { y: y, m: m };
+      });
+    }
+
+    useEffect(function(){
+      try { localStorage.setItem(LS_ENTRIES, JSON.stringify(entries)); } catch(e){}
+    }, [entries]);
+    useEffect(function(){
+      try { localStorage.setItem(LS_CURRENCY, currency); } catch(e){}
+    }, [currency]);
+
+    function handleItemChange(v){
+      setItem(v);
+      if (!manualCat) setCategory(classify(v));
+    }
+    function handleCategoryClick(key){
+      setCategory(key);
+      setManualCat(true);
+    }
+    function handleSave(){
+      var amt = parseFloat(amount);
+      if (!amt || amt <= 0 || !item.trim()) return;
+      var entry = {
+        id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
+        dateKey: tKey,
+        createdAt: Date.now(),
+        currency: currency, amount: amt,
+        item: item.trim(),
+        category: category
+      };
+      setEntries(function(prev){ return [entry].concat(prev); });
+      setAmount(''); setItem(''); setCategory('shopping'); setManualCat(false);
+    }
+    function handleDelete(id){
+      if (!window.confirm('이 항목을 삭제할까요?')) return;
+      setEntries(function(prev){ return prev.filter(function(e){ return e.id !== id; }); });
+    }
+    function handleAmountKeyDown(e){
+      if (e.key === 'Enter'){
+        var el = document.getElementById('item-field');
+        if (el) el.focus();
+      }
+    }
+    function handleItemKeyDown(e){ if (e.key === 'Enter') handleSave(); }
+
+    var todayTotals = useMemo(function(){
+      var map = {};
+      entries.forEach(function(e){
+        if (e.dateKey === tKey) map[e.currency] = (map[e.currency]||0) + e.amount;
+      });
+      return map;
+    }, [entries, tKey]);
+
+    var groups = useMemo(function(){
+      var byDate = {};
+      entries.forEach(function(e){
+        if (!byDate[e.dateKey]) byDate[e.dateKey] = [];
+        byDate[e.dateKey].push(e);
+      });
+      var keys = Object.keys(byDate).sort(function(a,b){ return b.localeCompare(a); });
+      return keys.map(function(k){
+        var dayEntries = byDate[k].slice().sort(function(a,b){ return b.createdAt - a.createdAt; });
+        var totals = {};
+        byDate[k].forEach(function(e){ totals[e.currency] = (totals[e.currency]||0) + e.amount; });
+        return { key: k, entries: dayEntries, totals: totals };
+      });
+    }, [entries]);
+
+    var monthStats = useMemo(function(){
+      var byCurrency = {};
+      entries.forEach(function(e){
+        if (e.dateKey.indexOf(statsMonthKey) !== 0) return;
+        if (!byCurrency[e.currency]) byCurrency[e.currency] = { total: 0, cats: {} };
+        byCurrency[e.currency].total += e.amount;
+        byCurrency[e.currency].cats[e.category] = (byCurrency[e.currency].cats[e.category] || 0) + e.amount;
+      });
+      var list = Object.keys(byCurrency).map(function(code){
+        var data = byCurrency[code];
+        var cats = Object.keys(data.cats).map(function(key){
+          var amt = data.cats[key];
+          return { key: key, amt: amt, pct: data.total > 0 ? (amt / data.total * 100) : 0 };
+        }).sort(function(a,b){ return b.amt - a.amt; });
+        return { code: code, total: data.total, cats: cats };
+      });
+      list.sort(function(a,b){ return b.total - a.total; });
+      return list;
+    }, [entries, statsMonthKey]);
+
+    var monthSgdTotal = useMemo(function(){
+      var total = 0;
+      entries.forEach(function(e){
+        if (e.dateKey.indexOf(statsMonthKey) !== 0) return;
+        total += e.amount * (FX_TO_SGD[e.currency] || 0);
+      });
+      return total;
+    }, [entries, statsMonthKey]);
+
+    var titleEl = view === 'ledger'
+      ? h('div', { className: 'date-header' }, formatHeader(today))
+      : h('div', { className: 'date-header month-nav' },
+          h('button', { className: 'month-arrow', onClick: prevMonth, 'aria-label': '이전 달' }, '‹'),
+          h('span', null, statsMonth.y + '년 ' + statsMonth.m + '월'),
+          h('button', { className: 'month-arrow', onClick: nextMonth, disabled: isCurrentMonth, 'aria-label': '다음 달' }, '›')
+        );
+
+    var currencyChips = CURRENCIES.map(function(c){
+      return h('button', {
+        key: c.code,
+        className: 'chip' + (currency === c.code ? ' selected' : ''),
+        onClick: function(){ setCurrency(c.code); }
+      }, c.code);
+    });
+
+    var categoryChips = CATS.map(function(c){
+      var sel = category === c.key;
+      var style = sel
+        ? { borderColor: c.color, background: 'color-mix(in srgb, ' + c.color + ' 14%, transparent)', color: c.color }
+        : {};
+      return h('button', {
+        key: c.key,
+        className: 'cat-chip' + (sel ? ' selected' : ''),
+        style: style,
+        onClick: function(){ handleCategoryClick(c.key); }
+      },
+        h('span', { className: 'dot', style: { background: c.color } }),
+        c.label
+      );
+    });
+
+    var todaySummaryEl = Object.keys(todayTotals).length === 0
+      ? h('span', { className: 'muted' }, '오늘 기록한 지출이 없어요.')
+      : h(React.Fragment, null,
+          h('span', { className: 'summary-label' }, '오늘 합계'),
+          Object.keys(todayTotals).map(function(cur){
+            return h('span', { key: cur }, formatAmount(cur, todayTotals[cur]));
+          })
+        );
+
+    var historyChildren = [];
+    if (groups.length === 0){
+      historyChildren.push(h('div', { className: 'empty-state', key: 'empty' }, '아직 기록이 없어요.', h('br'), '위에서 오늘 첫 지출을 적어보세요.'));
+    }
+    groups.forEach(function(g){
+      var entryRows = g.entries.map(function(e){
+        var cat = CAT_BY_KEY[e.category] || CAT_BY_KEY.shopping;
+        return h('div', { className: 'entry-row stamp-in', key: e.id, onClick: function(){ handleDelete(e.id); } },
+          h('span', { className: 'dot', style: { background: cat.color } }),
+          h('span', { className: 'entry-cat', style: { color: cat.color } }, cat.label),
+          h('span', { className: 'entry-item' }, e.item),
+          h('span', { className: 'entry-amount' }, formatAmount(e.currency, e.amount))
+        );
+      });
+      var totalsSpans = Object.keys(g.totals).map(function(cur, i){
+        return h('span', { key: cur }, (i > 0 ? ' · ' : '') + formatAmount(cur, g.totals[cur]));
+      });
+      historyChildren.push(
+        h('div', { className: 'day-group', key: g.key },
+          h('div', { className: 'day-header' },
+            h('span', null, formatDayLabel(g.key)),
+            h('span', { className: 'day-totals' }, totalsSpans)
+          ),
+          entryRows
+        )
+      );
+    });
+
+    var ledgerView = h(React.Fragment, null,
+      h('div', { className: 'form' },
+        h('div', { className: 'chip-row' }, currencyChips),
+        h('input', {
+          className: 'amount-input', type: 'number', inputMode: 'decimal', autoComplete: 'off',
+          placeholder: '금액', value: amount,
+          onChange: function(e){ setAmount(e.target.value); },
+          onKeyDown: handleAmountKeyDown
+        }),
+        h('input', {
+          id: 'item-field', className: 'item-input', type: 'text', autoComplete: 'off', enterKeyHint: 'done',
+          placeholder: '어디에 썼나요?', value: item,
+          onChange: function(e){ handleItemChange(e.target.value); },
+          onKeyDown: handleItemKeyDown
+        }),
+        h('div', { className: 'cat-row' }, categoryChips),
+        h('button', { className: 'save-btn', onClick: handleSave }, '기록하기')
+      ),
+      h('div', { className: 'perf' }),
+      h('div', { className: 'today-summary' }, todaySummaryEl),
+      h('div', { className: 'perf' }),
+      groups.length > 0 ? h('div', { className: 'hint' }, '탭하면 삭제할 수 있어요') : null,
+      h('div', { className: 'history' }, historyChildren)
+    );
+
+    var statsView;
+    if (monthStats.length === 0){
+      statsView = h('div', { className: 'stats' },
+        h('div', { className: 'empty-state' }, '이 달에는 기록이 없어요.')
+      );
+    } else {
+      var currencyBlocks = monthStats.map(function(cur){
+        var rows = cur.cats.map(function(c){
+          var meta = CAT_BY_KEY[c.key] || CAT_BY_KEY.shopping;
+          return h('div', { className: 'stats-row', key: c.key },
+            h('span', { className: 'dot', style: { background: meta.color } }),
+            h('span', { className: 'stats-cat-label' }, meta.label),
+            h('span', { className: 'stats-bar-track' },
+              h('span', { className: 'stats-bar-fill', style: { width: c.pct + '%', background: meta.color } })
+            ),
+            h('span', { className: 'stats-amount' }, formatAmount(cur.code, c.amt)),
+            h('span', { className: 'stats-pct' }, Math.round(c.pct) + '%')
+          );
+        });
+        return h('div', { className: 'stats-currency', key: cur.code },
+          h('div', { className: 'stats-currency-header' },
+            h('span', { className: 'stats-currency-code' }, cur.code),
+            h('span', { className: 'stats-currency-total' }, formatAmount(cur.code, cur.total))
+          ),
+          rows
+        );
+      });
+      statsView = h('div', { className: 'stats' },
+        h('div', { className: 'stats-sgd-total' },
+          h('span', { className: 'summary-label' }, '이번 달 합계 (SGD 환산, 참고용)'),
+          h('span', { className: 'stats-sgd-amount' }, '≈ ' + formatAmount('SGD', monthSgdTotal))
+        ),
+        currencyBlocks,
+        h('div', { className: 'stats-note' }, '* 환율은 대략적인 참고값으로, 실제 환율과 차이가 있을 수 있어요.')
+      );
+    }
+
+    return h('div', { className: 'app' },
+      h('div', { className: 'eyebrow' }, '가계부'),
+      titleEl,
+      h('div', { className: 'rule' }),
+      h('div', { className: 'tab-row' },
+        h('button', { className: 'tab' + (view === 'ledger' ? ' selected' : ''), onClick: function(){ setView('ledger'); } }, '기록'),
+        h('button', { className: 'tab' + (view === 'stats' ? ' selected' : ''), onClick: function(){ setView('stats'); } }, '월별 통계')
+      ),
+      view === 'ledger' ? ledgerView : statsView
+    );
+  }
+
+  var rootEl = document.getElementById('root');
+  rootEl.innerHTML = '';
+  ReactDOM.createRoot(rootEl).render(h(App));
+}
+</script>
+
+<script>
+(function(){
+  var REACT_URLS = [
+    'https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js',
+    'https://unpkg.com/react@18/umd/react.production.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js'
+  ];
+  var REACTDOM_URLS = [
+    'https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js',
+    'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js'
+  ];
+
+  function loadScriptOnce(url, checkGlobal){
+    return new Promise(function(resolve, reject){
+      var s = document.createElement('script');
+      s.src = url;
+      s.onload = function(){
+        if (!checkGlobal || checkGlobal()) resolve();
+        else reject(new Error('loaded but global missing: ' + url));
+      };
+      s.onerror = function(){ reject(new Error('failed to load: ' + url)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function loadWithFallback(urls, checkGlobal){
+    var p = Promise.reject();
+    urls.forEach(function(url){
+      p = p.catch(function(){ return loadScriptOnce(url, checkGlobal); });
+    });
+    return p;
+  }
+
+  function showError(){
+    var el = document.getElementById('boot-msg');
+    if (el) el.innerHTML = '앱을 불러오지 못했어요.<br/>인터넷 연결을 확인한 뒤 새로고침 해주세요.';
+  }
+
+  loadWithFallback(REACT_URLS, function(){ return !!window.React; })
+    .then(function(){ return loadWithFallback(REACTDOM_URLS, function(){ return !!window.ReactDOM; }); })
+    .then(function(){ bootApp(); })
+    .catch(function(err){
+      console.error(err);
+      showError();
+    });
+})();
+</script>
+</body>
+</html>
