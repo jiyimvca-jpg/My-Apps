@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#1E2A3A" />
+<title>My Apps</title>
+<link rel="icon" href="data:," />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500&display=swap');
+  :root {
+    --paper: #F7F2E7; --ink: #1E2A3A; --line: #DED2B4; --muted: #7A7160;
+  }
+  html, body { margin: 0; padding: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: 'Inter', system-ui, sans-serif; padding: 28px 18px 60px; }
+  .wrap { max-width: 460px; margin: 0 auto; }
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 4px;
+  }
+  h1 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 28px; margin: 0 0 24px; }
+  a.app-card {
+    display: block; border: 1px solid var(--line); border-radius: 4px; padding: 16px 18px;
+    margin-bottom: 12px; text-decoration: none; color: var(--ink); background: rgba(255,255,255,0.5);
+  }
+  a.app-card .name { font-family: 'Fraunces', serif; font-weight: 600; font-size: 16px; margin-bottom: 4px; }
+  a.app-card .desc { font-size: 13px; color: var(--muted); }
+  .empty { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="eyebrow">Personal tools</div>
+    <h1>My Apps</h1>
+
+    <!-- Add a new <a class="app-card"> block here each time you upload a new app. -->
+    <a class="app-card" href="sg-residency-tracker.html">
+      <div class="name">183-Day Tracker</div>
+      <div class="desc">Singapore tax residency day tracker</div>
+    </a>
+
+  </div>
+</body>
+</html>

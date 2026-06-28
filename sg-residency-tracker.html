@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="SG Tracker" />
+<meta name="theme-color" content="#1E2A3A" />
+<title>183-Day Tracker</title>
+<link rel="icon" href="data:," />
+<style>
+  html, body { margin: 0; padding: 0; background: #F7F2E7; }
+  #root { min-height: 100vh; }
+</style>
+<script>
+  function sgrtShowError(msg) {
+    var root = document.getElementById("root");
+    if (root) {
+      root.innerHTML =
+        '<div style="padding:30px 20px;font-family:system-ui,monospace;font-size:13px;' +
+        'color:#B8412E;white-space:pre-wrap;line-height:1.6;max-width:460px;margin:0 auto;">' +
+        "⚠️ " + msg +
+        '<br/><br/><button onclick="location.reload()" style="font-family:system-ui;font-size:13px;' +
+        'padding:8px 14px;border:1px solid #B8412E;background:none;color:#B8412E;border-radius:4px;' +
+        'cursor:pointer;">Retry</button></div>';
+    }
+  }
+  window.addEventListener("error", function (e) {
+    sgrtShowError("Error: " + (e.message || "unknown") + (e.filename ? "\n(" + e.filename + ":" + e.lineno + ")" : ""));
+  });
+  window.addEventListener("unhandledrejection", function (e) {
+    sgrtShowError("Error: " + (e.reason && e.reason.message ? e.reason.message : e.reason));
+  });
+
+  // Load each library from several CDNs in turn — if one provider is slow,
+  // blocked, or briefly down, the next one is tried automatically before
+  // giving up. The app itself only starts once both are confirmed loaded.
+  function sgrtLoadFromAny(urls, onDone, onFail, attempt) {
+    attempt = attempt || 0;
+    if (attempt >= urls.length) { onFail(); return; }
+    var s = document.createElement("script");
+    s.src = urls[attempt];
+    s.onload = onDone;
+    s.onerror = function () { sgrtLoadFromAny(urls, onDone, onFail, attempt + 1); };
+    document.head.appendChild(s);
+  }
+
+  var REACT_URLS = [
+    "https://unpkg.com/react@18/umd/react.production.min.js",
+    "https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js",
+  ];
+  var REACTDOM_URLS = [
+    "https://unpkg.com/react-dom@18/umd/react-dom.production.min.js",
+    "https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js",
+  ];
+
+  sgrtLoadFromAny(
+    REACT_URLS,
+    function () {
+      sgrtLoadFromAny(
+        REACTDOM_URLS,
+        function () {
+          if (window.__sgrtMain) window.__sgrtMain();
+        },
+        function () {
+          sgrtShowError("Could not load ReactDOM from any CDN (tried unpkg, jsdelivr, cdnjs). Your network may be blocking all of them — try a different wifi/data connection, or open this over a hosted URL instead of a local file.");
+        }
+      );
+    },
+    function () {
+      sgrtShowError("Could not load React from any CDN (tried unpkg, jsdelivr, cdnjs). Your network may be blocking all of them — try a different wifi/data connection, or open this over a hosted URL instead of a local file.");
+    }
+  );
+</script>
+</head>
+<body>
+<div id="root">
+  <div style="padding:60px 20px;text-align:center;font-family:system-ui,sans-serif;color:#7A7160;">Loading…</div>
+</div>
+
+<!-- Storage shim: same get/set/delete/list interface as Claude's artifact
+     storage, but backed by this browser's localStorage. No account, no
+     network call, no Claude dependency. Data lives only on this device
+     unless you use Export/Import to move it to another one. -->
+<script>
+  window.storage = {
+    async get(key) {
+      const raw = localStorage.getItem("sgrt_" + key);
+      if (raw === null) throw new Error("not found");
+      return { key, value: raw };
+    },
+    async set(key, value) {
+      localStorage.setItem("sgrt_" + key, value);
+      return { key, value };
+    },
+    async delete(key) {
+      localStorage.removeItem("sgrt_" + key);
+      return { key, deleted: true };
+    },
+    async list(prefix) {
+      const p = "sgrt_" + (prefix || "");
+      const keys = Object.keys(localStorage)
+        .filter((k) => k.startsWith(p))
+        .map((k) => k.slice(5));
+      return { keys, prefix };
+    },
+  };
+</script>
+
+<script>
+window.__sgrtMain = function () {
+if (window.__sgrtStarted) return;
+window.__sgrtStarted = true;
+"use strict";
+const { useState, useEffect, useMemo } = React;
+// Tiny drop-in replacements for the lucide-react icons used in the original
+// Claude artifact, so this file has zero external icon dependency.
+function PlaneLanding({ size = 14 }) { return React.createElement("span", { style: { fontSize: size, lineHeight: 1 } }, "\uD83D\uDEEC"); }
+function PlaneTakeoff({ size = 14 }) { return React.createElement("span", { style: { fontSize: size, lineHeight: 1 } }, "\uD83D\uDEEB"); }
+function Trash2({ size = 14 }) { return React.createElement("span", { style: { fontSize: size, lineHeight: 1 } }, "\uD83D\uDDD1"); }
+function Pencil({ size = 14 }) { return React.createElement("span", { style: { fontSize: size, lineHeight: 1 } }, "\u270F\uFE0F"); }
+function X({ size = 14 }) { return React.createElement("span", { style: { fontSize: size, lineHeight: 1, fontWeight: 600 } }, "\u2715"); }
+function ShieldCheck({ size = 14 }) { return React.createElement("span", { style: { fontSize: size, lineHeight: 1 } }, "\u2705"); }
+const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');`;
+function localDateKey(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+}
+function dateOnly(value) {
+    const d = new Date(value);
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+function fmt(value) {
+    if (!value)
+        return "—";
+    const d = new Date(value);
+    const datePart = d.toLocaleDateString("en-SG", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+    });
+    const hour = String(d.getHours()).padStart(2, "0");
+    return `${datePart}, ${hour}:00`;
+}
+// datetime-local inputs return "YYYY-MM-DDTHH:mm" — force minutes to :00 so
+// storage stays hour-granular even if a browser doesn't fully honor step=3600.
+function snapToHour(value) {
+    if (!value)
+        return "";
+    return value.slice(0, 13) + ":00";
+}
+function computeYearBuckets(trips) {
+    const buckets = {};
+    trips.forEach((trip) => {
+        if (!trip.arrival)
+            return;
+        const start = dateOnly(trip.arrival);
+        const end = dateOnly(trip.departure || new Date());
+        if (end < start)
+            return;
+        let cur = new Date(start);
+        let guard = 0;
+        while (cur <= end && guard < 2000) {
+            const y = cur.getFullYear();
+            if (!buckets[y])
+                buckets[y] = new Set();
+            buckets[y].add(localDateKey(cur));
+            cur.setDate(cur.getDate() + 1);
+            guard++;
+        }
+    });
+    return buckets;
+}
+// Counts the days strictly between a departure and the next arrival (the days
+// actually spent outside Singapore) that fall within a given calendar year.
+function countGapDaysInYear(departure, nextArrival, year) {
+    let cur = dateOnly(departure);
+    cur.setDate(cur.getDate() + 1);
+    const end = dateOnly(nextArrival);
+    let count = 0;
+    let guard = 0;
+    while (cur < end && guard < 2000) {
+        if (cur.getFullYear() === year)
+            count++;
+        cur.setDate(cur.getDate() + 1);
+        guard++;
+    }
+    return count;
+}
+function daysLeftInYear(year) {
+    const today = new Date();
+    if (year < today.getFullYear())
+        return 0;
+    const end = new Date(year, 11, 31);
+    const start = year === today.getFullYear() ? dateOnly(today) : new Date(year, 0, 1);
+    const ms = end.setHours(0, 0, 0, 0) - start.setHours(0, 0, 0, 0);
+    return Math.max(Math.round(ms / 86400000) + 1, 0);
+}
+function buildExportText(trips, years, buckets) {
+    const lines = [];
+    const today = new Date().toLocaleDateString("en-SG", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+    });
+    lines.push(`Singapore residency tracker — exported ${today}`);
+    lines.push("");
+    lines.push("YEARLY TOTALS");
+    years.forEach((y) => {
+        const total = buckets[y] ? buckets[y].size : 0;
+        const status = total >= 183 ? "183-day threshold met" : `${183 - total} days short of 183`;
+        lines.push(`${y}: ${total} / 183 days — ${status}`);
+    });
+    lines.push("");
+    lines.push("STAYS (Landed in SG → Left SG)");
+    const sorted = [...trips].sort((a, b) => new Date(a.arrival) - new Date(b.arrival));
+    if (sorted.length === 0)
+        lines.push("(none logged yet)");
+    sorted.forEach((t) => {
+        const inStr = fmt(t.arrival);
+        const outStr = t.departure ? fmt(t.departure) : "ongoing";
+        lines.push(`${inStr}  →  ${outStr}${t.note ? "  — " + t.note : ""}`);
+    });
+    // Machine-readable payload so this same text can be pasted back in on
+    // another device and restored exactly — the lines above are just for you
+    // to read; the line below is what the Import feature actually parses.
+    lines.push("");
+    lines.push("---");
+    lines.push("Don't edit below this line — used by Import to restore your data.");
+    lines.push("DATA_JSON:" + JSON.stringify(trips));
+    return lines.join("\n");
+}
+const STORAGE_KEY = "sg-residency-trips";
+const SEED_FLAG_KEY = "sg-residency-seed-applied-v2";
+// Jan–June 2026 stays, restored from backups, plus a boundary marker dated
+// in late 2025 so the gap before the first known 2026 stay (Jan 11, 23:00)
+// computes as "away" instead of "no data". Deterministic ids (based on
+// arrival time) so re-running this merge never creates duplicates, and the
+// SEED_FLAG_KEY ensures each batch only merges in once — if you later edit
+// or delete one of these, it won't come back on the next reload.
+const SEED_DATA = [
+    // Boundary marker only — not a real logged stay. Its sole purpose is to
+    // anchor the away-gap calculation; it falls entirely in 2025 so it has no
+    // effect on your 2026 totals.
+    { arrival: "2025-12-31T00:00", departure: "2025-12-31T23:00", note: "(boundary marker — everything before this is treated as away)" },
+    { arrival: "2026-01-11T23:00", departure: "2026-01-15T19:00", note: "" },
+    { arrival: "2026-01-19T23:00", departure: "2026-01-22T19:00", note: "" },
+    { arrival: "2026-01-26T23:00", departure: "2026-01-30T17:00", note: "" },
+    { arrival: "2026-02-02T23:00", departure: "2026-02-04T19:00", note: "" },
+    { arrival: "2026-02-08T23:00", departure: "2026-02-12T19:00", note: "" },
+    { arrival: "2026-02-23T23:00", departure: "2026-02-27T07:00", note: "" },
+    { arrival: "2026-03-02T23:00", departure: "2026-03-04T10:00", note: "" },
+    { arrival: "2026-03-11T23:00", departure: "2026-03-13T07:00", note: "Korea trip" },
+    { arrival: "2026-03-15T23:00", departure: "2026-03-18T18:00", note: "" },
+    { arrival: "2026-03-23T23:00", departure: "2026-03-26T19:00", note: "" },
+    { arrival: "2026-03-31T00:00", departure: "2026-04-02T20:00", note: "" },
+    { arrival: "2026-04-07T00:00", departure: "2026-04-09T20:00", note: "" },
+    { arrival: "2026-04-13T21:00", departure: "2026-04-17T20:00", note: "" },
+    { arrival: "2026-04-20T23:00", departure: "2026-04-23T20:00", note: "" },
+    { arrival: "2026-04-27T23:00", departure: "2026-05-01T07:00", note: "" },
+    { arrival: "2026-05-04T23:00", departure: "2026-05-08T17:00", note: "" },
+    { arrival: "2026-05-11T21:00", departure: "2026-05-15T17:00", note: "" },
+    { arrival: "2026-05-18T23:00", departure: "2026-05-21T20:00", note: "" },
+    { arrival: "2026-05-24T21:00", departure: "2026-05-28T10:00", note: "" },
+    { arrival: "2026-06-01T15:00", departure: "2026-06-04T20:00", note: "Family trip to VN" },
+    { arrival: "2026-06-07T21:00", departure: "2026-06-13T07:00", note: "" },
+    { arrival: "2026-06-15T21:00", departure: "2026-06-19T16:00", note: "" },
+    { arrival: "2026-06-21T21:00", departure: "2026-06-26T05:00", note: "" },
+    { arrival: "2026-06-28T21:00", departure: null, note: "" },
+].map((t) => (Object.assign(Object.assign({}, t), { id: "seed-" + t.arrival })));
+function SGResidencyTracker() {
+    const [trips, setTrips] = useState([]);
+    const [loaded, setLoaded] = useState(false);
+    const [year, setYear] = useState(new Date().getFullYear());
+    const [editingId, setEditingId] = useState(null);
+    const [formMode, setFormMode] = useState("trip"); // 'trip' = left SG then landed SG, 'stay' = landed SG then left SG
+    const [form, setForm] = useState({
+        arrivalDateTime: "",
+        departureDateTime: "",
+        ongoing: false,
+        note: "",
+    });
+    const [error, setError] = useState("");
+    const [showExport, setShowExport] = useState(false);
+    const [exportText, setExportText] = useState("");
+    const [copyStatus, setCopyStatus] = useState("idle"); // idle | copied | manual
+    const [showImport, setShowImport] = useState(false);
+    const [importText, setImportText] = useState("");
+    const [importStatus, setImportStatus] = useState("idle"); // idle | success | error
+    useEffect(() => {
+        (async () => {
+            let current = [];
+            try {
+                const res = await window.storage.get(STORAGE_KEY);
+                if (res && res.value)
+                    current = JSON.parse(res.value);
+            }
+            catch (e) {
+                // no saved data yet
+            }
+            let seedApplied = false;
+            try {
+                const flag = await window.storage.get(SEED_FLAG_KEY);
+                seedApplied = flag && flag.value === "true";
+            }
+            catch (e) {
+                // flag not set yet
+            }
+            if (!seedApplied) {
+                const map = {};
+                current.forEach((t) => (map[t.id] = t));
+                SEED_DATA.forEach((t) => {
+                    if (!map[t.id])
+                        map[t.id] = t;
+                });
+                current = Object.values(map).sort((a, b) => new Date(a.arrival) - new Date(b.arrival));
+                try {
+                    await window.storage.set(STORAGE_KEY, JSON.stringify(current));
+                    await window.storage.set(SEED_FLAG_KEY, "true");
+                }
+                catch (e) {
+                    console.error("Could not save seeded data", e);
+                }
+            }
+            setTrips(current);
+            setLoaded(true);
+        })();
+    }, []);
+    async function persist(next) {
+        setTrips(next);
+        try {
+            await window.storage.set(STORAGE_KEY, JSON.stringify(next));
+        }
+        catch (e) {
+            console.error("Could not save", e);
+        }
+    }
+    function resetForm() {
+        setForm({ arrivalDateTime: "", departureDateTime: "", ongoing: false, note: "" });
+        setEditingId(null);
+        setFormMode("trip");
+        setError("");
+    }
+    function startEdit(trip) {
+        setForm({
+            arrivalDateTime: trip.arrival || "",
+            departureDateTime: trip.departure || "",
+            ongoing: !trip.departure,
+            note: trip.note || "",
+        });
+        setEditingId(trip.id);
+        setFormMode("stay");
+        setError("");
+    }
+    function handleSubmit(e) {
+        e.preventDefault();
+        if (formMode === "trip") {
+            // Trip-away mode: Left Singapore first, Landed in Singapore second.
+            if (!form.departureDateTime) {
+                setError("Enter when you left Singapore.");
+                return;
+            }
+            if (!form.ongoing && !form.arrivalDateTime) {
+                setError("Enter when you landed back in Singapore, or mark it as still away.");
+                return;
+            }
+            const departure = snapToHour(form.departureDateTime);
+            const arrival = form.ongoing ? null : snapToHour(form.arrivalDateTime);
+            if (arrival && new Date(arrival) <= new Date(departure)) {
+                setError("Landing back in Singapore has to be after you left.");
+                return;
+            }
+            let next = trips;
+            const openStays = trips.filter((t) => !t.departure);
+            if (openStays.length) {
+                const latestOpen = openStays.sort((a, b) => new Date(b.arrival) - new Date(a.arrival))[0];
+                if (new Date(departure) <= new Date(latestOpen.arrival)) {
+                    setError(`Left Singapore has to be after ${fmt(latestOpen.arrival)}, when your current stay began. Edit that stay directly instead if the arrival date itself was wrong.`);
+                    return;
+                }
+                next = trips.map((t) => (t.id === latestOpen.id ? Object.assign(Object.assign({}, t), { departure }) : t));
+            }
+            if (arrival) {
+                next = [
+                    ...next,
+                    {
+                        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+                        arrival,
+                        departure: null,
+                        note: form.note.trim(),
+                    },
+                ];
+            }
+            next.sort((a, b) => new Date(a.arrival) - new Date(b.arrival));
+            persist(next);
+            resetForm();
+            return;
+        }
+        // Stay mode: Landed in Singapore first, Left Singapore second — edits a single record.
+        if (!form.arrivalDateTime) {
+            setError("Enter when you landed in Singapore.");
+            return;
+        }
+        if (!form.ongoing && !form.departureDateTime) {
+            setError("Enter when you left Singapore, or mark it as ongoing.");
+            return;
+        }
+        const arrival = snapToHour(form.arrivalDateTime);
+        const departure = form.ongoing ? null : snapToHour(form.departureDateTime);
+        if (departure && new Date(departure) < new Date(arrival)) {
+            setError("Departure can't be before arrival.");
+            return;
+        }
+        const entry = {
+            id: editingId || Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+            arrival,
+            departure,
+            note: form.note.trim(),
+        };
+        let next;
+        if (editingId) {
+            next = trips.map((t) => (t.id === editingId ? entry : t));
+        }
+        else {
+            next = [...trips, entry];
+        }
+        next.sort((a, b) => new Date(a.arrival) - new Date(b.arrival));
+        persist(next);
+        resetForm();
+    }
+    function handleDelete(id) {
+        persist(trips.filter((t) => t.id !== id));
+        if (editingId === id)
+            resetForm();
+    }
+    async function handleExport() {
+        const text = buildExportText(trips, years, buckets);
+        setExportText(text);
+        setShowExport(true);
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopyStatus("copied");
+        }
+        catch (e) {
+            setCopyStatus("manual");
+        }
+    }
+    async function handleCopyAgain() {
+        try {
+            await navigator.clipboard.writeText(exportText);
+            setCopyStatus("copied");
+        }
+        catch (e) {
+            setCopyStatus("manual");
+        }
+    }
+    function handleImport() {
+        const marker = "DATA_JSON:";
+        const idx = importText.indexOf(marker);
+        if (idx === -1) {
+            setImportStatus("error");
+            return;
+        }
+        try {
+            const json = importText.slice(idx + marker.length).trim();
+            const importedTrips = JSON.parse(json);
+            if (!Array.isArray(importedTrips))
+                throw new Error("bad format");
+            const map = {};
+            trips.forEach((t) => (map[t.id] = t));
+            importedTrips.forEach((t) => (map[t.id] = t)); // imported copy wins on id conflicts
+            const merged = Object.values(map).sort((a, b) => new Date(a.arrival) - new Date(b.arrival));
+            persist(merged);
+            setImportStatus("success");
+            setImportText("");
+        }
+        catch (e) {
+            setImportStatus("error");
+        }
+    }
+    const buckets = useMemo(() => computeYearBuckets(trips), [trips]);
+    const years = useMemo(() => {
+        const s = new Set([new Date().getFullYear()]);
+        Object.keys(buckets).forEach((y) => s.add(Number(y)));
+        return Array.from(s).sort((a, b) => a - b);
+    }, [buckets]);
+    const total = buckets[year] ? buckets[year].size : 0;
+    const progress = Math.min(total / 183, 1);
+    const remaining = Math.max(183 - total, 0);
+    const left = daysLeftInYear(year);
+    const met = total >= 183;
+    const impossible = !met && remaining > left && year >= new Date().getFullYear();
+    const isForwardLooking = year >= new Date().getFullYear();
+    const isLeapYear = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+    const daysInYearVal = isLeapYear ? 366 : 365;
+    const totalAwayAllowance = Math.max(daysInYearVal - 183, 0);
+    const awayBudget = Math.max(left - remaining, 0);
+    const awayBudgetClass = impossible ? "warn" : met ? "ok" : awayBudget <= 21 ? "tight" : "ok";
+    const mainNumber = isForwardLooking ? (met ? left : awayBudget) : total;
+    const mainLabel = isForwardLooking
+        ? met
+            ? `free days left in ${year}`
+            : `away-days left in ${year}`
+        : "of 183 days";
+    const mainProgress = isForwardLooking
+        ? met
+            ? 1
+            : totalAwayAllowance > 0
+                ? Math.min(awayBudget / totalAwayAllowance, 1)
+                : 0
+        : progress;
+    const mainColorKey = isForwardLooking ? awayBudgetClass : met ? "ok" : "warn";
+    const ringColors = { ok: "#2F6B4F", tight: "#B8862E", warn: "#B8412E" };
+    const ringStrokeColor = ringColors[mainColorKey];
+    const displayRows = useMemo(() => {
+        const sorted = [...trips].sort((a, b) => new Date(a.arrival) - new Date(b.arrival));
+        const rows = [];
+        sorted.forEach((t, i) => {
+            rows.push({ type: "stay", id: t.id, trip: t });
+            if (t.departure) {
+                const next = sorted[i + 1];
+                if (next) {
+                    const totalGapDays = Math.round((dateOnly(next.arrival) - dateOnly(t.departure)) / 86400000) - 1;
+                    if (totalGapDays > 0) {
+                        rows.push({
+                            type: "away",
+                            id: `gap-${t.id}-${next.id}`,
+                            from: t.departure,
+                            to: next.arrival,
+                            yearDays: countGapDaysInYear(t.departure, next.arrival, year),
+                        });
+                    }
+                }
+            }
+        });
+        return rows
+            .filter((row) => {
+            if (row.type === "stay") {
+                const start = dateOnly(row.trip.arrival).getFullYear();
+                const end = dateOnly(row.trip.departure || new Date()).getFullYear();
+                return start <= year && end >= year;
+            }
+            return row.yearDays > 0;
+        })
+            .reverse();
+    }, [trips, year]);
+    const r = 78;
+    const circumference = 2 * Math.PI * r;
+    const dashoffset = circumference * (1 - mainProgress);
+    // Calendar view: a day-by-day grid is the least ambiguous way to see what's
+    // actually been logged — green run = a stay, red run = an away gap, no
+    // pairing logic to misread.
+    const sgDateSet = useMemo(() => {
+        const set = new Set();
+        Object.values(buckets).forEach((s) => s.forEach((d) => set.add(d)));
+        return set;
+    }, [buckets]);
+    const awayDateSet = useMemo(() => {
+        const sorted = [...trips].sort((a, b) => new Date(a.arrival) - new Date(b.arrival));
+        const set = new Set();
+        sorted.forEach((t, i) => {
+            if (t.departure) {
+                const next = sorted[i + 1];
+                if (next) {
+                    let cur = dateOnly(t.departure);
+                    cur.setDate(cur.getDate() + 1);
+                    const end = dateOnly(next.arrival);
+                    let guard = 0;
+                    while (cur < end && guard < 3000) {
+                        set.add(localDateKey(cur));
+                        cur.setDate(cur.getDate() + 1);
+                        guard++;
+                    }
+                }
+            }
+        });
+        return set;
+    }, [trips]);
+    const [calMonth, setCalMonth] = useState(() => {
+        const d = new Date();
+        d.setDate(1);
+        return d;
+    });
+    const calCells = useMemo(() => {
+        const y = calMonth.getFullYear();
+        const m = calMonth.getMonth();
+        const startOffset = new Date(y, m, 1).getDay();
+        const daysInMonth = new Date(y, m + 1, 0).getDate();
+        const todayKey = localDateKey(new Date());
+        const cells = [];
+        for (let i = 0; i < startOffset; i++)
+            cells.push(null);
+        for (let d = 1; d <= daysInMonth; d++) {
+            const key = localDateKey(new Date(y, m, d));
+            let status = "unknown";
+            if (sgDateSet.has(key))
+                status = "sg";
+            else if (awayDateSet.has(key))
+                status = "away";
+            cells.push({ day: d, key, status, isToday: key === todayKey });
+        }
+        return cells;
+    }, [calMonth, sgDateSet, awayDateSet]);
+    const calMonthLabel = calMonth.toLocaleDateString("en-SG", { month: "long", year: "numeric" });
+    function prevMonth() {
+        setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1));
+    }
+    function nextMonth() {
+        setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1));
+    }
+    return (React.createElement("div", { className: "sgrt-root" },
+        React.createElement("style", null, `
+        ${FONT_IMPORT}
+        .sgrt-root {
+          --paper: #F7F2E7;
+          --ink: #1E2A3A;
+          --red: #B8412E;
+          --green: #2F6B4F;
+          --line: #DED2B4;
+          --muted: #7A7160;
+          font-family: 'Inter', system-ui, sans-serif;
+          background: var(--paper);
+          color: var(--ink);
+          min-height: 100vh;
+          padding: 28px 18px 60px;
+          box-sizing: border-box;
+        }
+        .sgrt-root * { box-sizing: border-box; }
+        .sgrt-wrap { max-width: 460px; margin: 0 auto; }
+        .sgrt-eyebrow {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 11px;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: var(--muted);
+          margin-bottom: 4px;
+        }
+        .sgrt-title { font-family: 'Fraunces', serif; font-weight: 600; font-size: 28px; margin: 0 0 18px; line-height: 1.1; }
+        .sgrt-years { display: flex; gap: 6px; margin-bottom: 18px; overflow-x: auto; }
+        .sgrt-year-btn {
+          font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 6px 14px; border-radius: 999px;
+          border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; white-space: nowrap;
+        }
+        .sgrt-year-btn.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+        .sgrt-stamp-card {
+          position: relative; border: 1.5px solid var(--ink); border-radius: 4px; padding: 28px 20px 22px;
+          margin-bottom: 18px; display: flex; flex-direction: column; align-items: center;
+          background: rgba(255,255,255,0.35); transform: rotate(-0.6deg);
+        }
+        .sgrt-ring-wrap { position: relative; width: 180px; height: 180px; }
+        .sgrt-ring-wrap svg { transform: rotate(-90deg); }
+        .sgrt-ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .sgrt-count { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 42px; line-height: 1; }
+        .sgrt-count-label { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); margin-top: 2px; }
+        .sgrt-status { margin-top: 14px; text-align: center; font-size: 14px; line-height: 1.5; }
+        .sgrt-status.warn { color: var(--red); }
+        .sgrt-status.ok { color: var(--green); }
+        .sgrt-status.tight { color: #B8862E; }
+        .sgrt-resident-stamp {
+          position: absolute; top: 14px; right: 8px; font-family: 'JetBrains Mono', monospace; font-weight: 600;
+          font-size: 12px; letter-spacing: 0.08em; color: var(--green); border: 2px solid var(--green); border-radius: 6px;
+          padding: 3px 7px; transform: rotate(8deg); display: flex; align-items: center; gap: 4px;
+        }
+        .sgrt-card { border: 1px solid var(--line); border-radius: 4px; padding: 18px; margin-bottom: 18px; background: rgba(255,255,255,0.5); }
+        .sgrt-card h2 { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 600; margin: 0 0 14px; }
+        .sgrt-mode-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+        .sgrt-mode-tab {
+          flex: 1; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; padding: 8px 0; border-radius: 3px;
+          border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer;
+        }
+        .sgrt-mode-tab.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+        .sgrt-field { margin-bottom: 12px; }
+        .sgrt-field label {
+          display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-bottom: 5px;
+          font-family: 'JetBrains Mono', monospace;
+        }
+        .sgrt-field input[type="datetime-local"],
+        .sgrt-field input[type="text"] {
+          width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 3px; background: #fff;
+          font-family: 'Inter', sans-serif; font-size: 14px; color: var(--ink);
+        }
+        .sgrt-checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 12px; color: var(--ink); }
+        .sgrt-error { color: var(--red); font-size: 13px; margin-bottom: 10px; }
+        .sgrt-btn-row { display: flex; gap: 8px; }
+        .sgrt-btn { font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 10px 16px; border-radius: 3px; border: none; cursor: pointer; flex: 1; }
+        .sgrt-btn.primary { background: var(--ink); color: var(--paper); }
+        .sgrt-btn.secondary { background: transparent; color: var(--muted); border: 1px solid var(--line); flex: 0; }
+        .sgrt-trip { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 12px 0; border-bottom: 1px dashed var(--line); }
+        .sgrt-trip:last-child { border-bottom: none; }
+        .sgrt-away-row {
+          text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted);
+          padding: 7px 0; border-bottom: 1px dashed var(--line); background: rgba(184,65,46,0.04);
+        }
+        .sgrt-away-row:last-child { border-bottom: none; }
+        .sgrt-cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .sgrt-cal-nav {
+          background: none; border: 1px solid var(--line); border-radius: 3px; width: 28px; height: 28px;
+          cursor: pointer; color: var(--ink); font-size: 16px; line-height: 1;
+        }
+        .sgrt-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        .sgrt-cal-dow { text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); padding-bottom: 4px; }
+        .sgrt-cal-cell {
+          aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+          font-family: 'JetBrains Mono', monospace; font-size: 12px; border-radius: 4px; background: #EFE8D8; color: var(--muted);
+        }
+        .sgrt-cal-cell.empty { background: transparent; }
+        .sgrt-cal-cell.sg { background: rgba(47,107,79,0.85); color: #fff; font-weight: 600; }
+        .sgrt-cal-cell.away { background: rgba(184,65,46,0.85); color: #fff; font-weight: 600; }
+        .sgrt-cal-cell.today { box-shadow: 0 0 0 2px var(--ink) inset; }
+        .sgrt-cal-legend { display: flex; gap: 14px; margin-top: 10px; font-size: 11px; color: var(--muted); font-family: 'Inter', sans-serif; flex-wrap: wrap; }
+        .sgrt-cal-legend .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+        .sgrt-cal-legend .dot.sg { background: rgba(47,107,79,0.85); }
+        .sgrt-cal-legend .dot.away { background: rgba(184,65,46,0.85); }
+        .sgrt-cal-legend .dot.unknown { background: #EFE8D8; border: 1px solid var(--line); }
+        .sgrt-trip-dates { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.6; }
+        .sgrt-trip-dates .arr { color: var(--green); }
+        .sgrt-trip-dates .dep { color: var(--red); }
+        .sgrt-trip-note { font-size: 12px; color: var(--muted); margin-top: 2px; font-family: 'Inter', sans-serif; }
+        .sgrt-trip-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        .sgrt-trip-days {
+          font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; background: var(--paper);
+          border: 1px solid var(--line); border-radius: 3px; padding: 3px 7px; white-space: nowrap;
+        }
+        .sgrt-icon-btn { background: none; border: none; cursor: pointer; color: var(--muted); padding: 2px; display: flex; }
+        .sgrt-icon-btn:hover { color: var(--ink); }
+        .sgrt-empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
+        .sgrt-footnote { font-size: 12px; color: var(--muted); line-height: 1.6; border-top: 1px dashed var(--line); padding-top: 14px; margin-top: 6px; }
+        .sgrt-reset {
+          font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); text-decoration: underline;
+          background: none; border: none; cursor: pointer; padding: 0; margin-top: 12px;
+        }
+        .sgrt-summary-row {
+          display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px dashed var(--line);
+          background: none; border-left: none; border-right: none; border-top: none; width: 100%; cursor: pointer;
+          font-family: 'Inter', sans-serif; text-align: left;
+        }
+        .sgrt-summary-row:last-child { border-bottom: none; }
+        .sgrt-summary-row.active .sgrt-summary-year { color: var(--ink); font-weight: 600; }
+        .sgrt-summary-year { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--muted); }
+        .sgrt-summary-total { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+        .sgrt-summary-badge { font-size: 11px; padding: 2px 7px; border-radius: 999px; margin-left: 8px; font-family: 'JetBrains Mono', monospace; }
+        .sgrt-summary-badge.met { background: rgba(47,107,79,0.12); color: var(--green); }
+        .sgrt-summary-badge.short { background: rgba(184,65,46,0.1); color: var(--red); }
+        .sgrt-footer-actions { display: flex; gap: 14px; margin-top: 12px; flex-wrap: wrap; }
+        .sgrt-export-box { margin-top: 12px; border: 1px solid var(--line); border-radius: 4px; padding: 12px; background: rgba(255,255,255,0.6); }
+        .sgrt-export-box textarea {
+          width: 100%; min-height: 140px; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; line-height: 1.5;
+          border: 1px solid var(--line); border-radius: 3px; padding: 8px; background: #fff; color: var(--ink); resize: vertical;
+        }
+        .sgrt-export-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; flex-wrap: wrap; gap: 8px; }
+        .sgrt-export-note { font-size: 11.5px; color: var(--muted); font-family: 'Inter', sans-serif; }
+        .sgrt-export-note.copied { color: var(--green); }
+        .sgrt-export-note.error { color: var(--red); }
+      `),
+        React.createElement("div", { className: "sgrt-wrap" },
+            React.createElement("div", { className: "sgrt-eyebrow" }, "Singapore tax residency"),
+            React.createElement("h1", { className: "sgrt-title" }, "183-day tracker"),
+            React.createElement("div", { className: "sgrt-years" }, years.map((y) => (React.createElement("button", { key: y, className: `sgrt-year-btn ${y === year ? "active" : ""}`, onClick: () => setYear(y) }, y)))),
+            React.createElement("div", { className: "sgrt-stamp-card" },
+                met && (React.createElement("div", { className: "sgrt-resident-stamp" },
+                    React.createElement(ShieldCheck, { size: 13 }),
+                    " RESIDENT")),
+                React.createElement("div", { className: "sgrt-ring-wrap" },
+                    React.createElement("svg", { width: "180", height: "180" },
+                        React.createElement("circle", { cx: "90", cy: "90", r: r, fill: "none", stroke: "#DED2B4", strokeWidth: "10" }),
+                        React.createElement("circle", { cx: "90", cy: "90", r: r, fill: "none", stroke: ringStrokeColor, strokeWidth: "10", strokeDasharray: circumference, strokeDashoffset: dashoffset, strokeLinecap: "round", style: { transition: "stroke-dashoffset 0.4s ease" } })),
+                    React.createElement("div", { className: "sgrt-ring-center" },
+                        React.createElement("div", { className: "sgrt-count" }, mainNumber),
+                        React.createElement("div", { className: "sgrt-count-label" }, mainLabel))),
+                React.createElement("div", { className: `sgrt-status ${mainColorKey}` }, isForwardLooking ? (met ? (React.createElement(React.Fragment, null,
+                    "Already secured ",
+                    total,
+                    " days in Singapore \u2014 every remaining day in ",
+                    year,
+                    " is yours to use freely.")) : impossible ? (React.createElement(React.Fragment, null,
+                    total,
+                    " of 183 days in Singapore so far \u2014 only ",
+                    left,
+                    " days remain in ",
+                    year,
+                    ", so 183 isn't reachable now.")) : awayBudgetClass === "tight" ? (React.createElement(React.Fragment, null,
+                    total,
+                    " of 183 days in Singapore so far \u00B7 only ",
+                    awayBudget,
+                    " away-day",
+                    awayBudget === 1 ? "" : "s",
+                    " left before you'd need to stay put through Dec 31. Worth holding off on extra trips.")) : (React.createElement(React.Fragment, null,
+                    total,
+                    " of 183 days in Singapore so far \u00B7 ",
+                    awayBudget,
+                    " away-days left before you'd need to stay for the rest of ",
+                    year,
+                    "."))) : met ? (React.createElement(React.Fragment, null,
+                    "Threshold met for ",
+                    year,
+                    ".")) : (React.createElement(React.Fragment, null,
+                    remaining,
+                    " days short for ",
+                    year,
+                    ".")))),
+            React.createElement("div", { className: "sgrt-card" },
+                React.createElement("div", { className: "sgrt-cal-header" },
+                    React.createElement("button", { type: "button", className: "sgrt-cal-nav", onClick: prevMonth }, "\u2039"),
+                    React.createElement("h2", { style: { margin: 0 } }, calMonthLabel),
+                    React.createElement("button", { type: "button", className: "sgrt-cal-nav", onClick: nextMonth }, "\u203A")),
+                React.createElement("div", { className: "sgrt-cal-grid" },
+                    ["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (React.createElement("div", { className: "sgrt-cal-dow", key: "dow" + i }, d))),
+                    calCells.map((c, i) => c === null ? (React.createElement("div", { className: "sgrt-cal-cell empty", key: "e" + i })) : (React.createElement("div", { key: c.key, className: `sgrt-cal-cell ${c.status} ${c.isToday ? "today" : ""}` }, c.day)))),
+                React.createElement("div", { className: "sgrt-cal-legend" },
+                    React.createElement("span", null,
+                        React.createElement("i", { className: "dot sg" }),
+                        "In Singapore"),
+                    React.createElement("span", null,
+                        React.createElement("i", { className: "dot away" }),
+                        "Away"),
+                    React.createElement("span", null,
+                        React.createElement("i", { className: "dot unknown" }),
+                        "No data logged"))),
+            years.length > 1 && (React.createElement("div", { className: "sgrt-card" },
+                React.createElement("h2", null, "Yearly summary"),
+                years.slice().reverse().map((y) => {
+                    const yTotal = buckets[y] ? buckets[y].size : 0;
+                    const yMet = yTotal >= 183;
+                    return (React.createElement("button", { key: y, className: `sgrt-summary-row ${y === year ? "active" : ""}`, onClick: () => setYear(y) },
+                        React.createElement("span", { className: "sgrt-summary-year" }, y),
+                        React.createElement("span", null,
+                            React.createElement("span", { className: "sgrt-summary-total" },
+                                yTotal,
+                                " / 183"),
+                            React.createElement("span", { className: `sgrt-summary-badge ${yMet ? "met" : "short"}` }, yMet ? "✓ resident" : `${183 - yTotal}d short`))));
+                }))),
+            React.createElement("form", { className: "sgrt-card", onSubmit: handleSubmit },
+                React.createElement("h2", null, editingId ? "Edit stay" : "Add an entry"),
+                !editingId && (React.createElement("div", { className: "sgrt-mode-tabs" },
+                    React.createElement("button", { type: "button", className: `sgrt-mode-tab ${formMode === "trip" ? "active" : ""}`, onClick: () => setFormMode("trip") }, "Trip away"),
+                    React.createElement("button", { type: "button", className: `sgrt-mode-tab ${formMode === "stay" ? "active" : ""}`, onClick: () => setFormMode("stay") }, "Stay in SG"))),
+                error && React.createElement("div", { className: "sgrt-error" }, error),
+                formMode === "trip" && !editingId ? (React.createElement(React.Fragment, null,
+                    React.createElement("div", { className: "sgrt-field" },
+                        React.createElement("label", null,
+                            React.createElement(PlaneTakeoff, { size: 13 }),
+                            " Left Singapore"),
+                        React.createElement("input", { type: "datetime-local", step: "3600", value: form.departureDateTime, onChange: (e) => setForm(Object.assign(Object.assign({}, form), { departureDateTime: e.target.value })) })),
+                    React.createElement("div", { className: "sgrt-checkbox-row" },
+                        React.createElement("input", { type: "checkbox", id: "ongoing", checked: form.ongoing, onChange: (e) => setForm(Object.assign(Object.assign({}, form), { ongoing: e.target.checked })) }),
+                        React.createElement("label", { htmlFor: "ongoing", style: { margin: 0, fontFamily: "Inter, sans-serif" } }, "Still away \u2014 no return flight yet")),
+                    !form.ongoing && (React.createElement("div", { className: "sgrt-field" },
+                        React.createElement("label", null,
+                            React.createElement(PlaneLanding, { size: 13 }),
+                            " Landed back in Singapore"),
+                        React.createElement("input", { type: "datetime-local", step: "3600", value: form.arrivalDateTime, onChange: (e) => setForm(Object.assign(Object.assign({}, form), { arrivalDateTime: e.target.value })) }))))) : (React.createElement(React.Fragment, null,
+                    React.createElement("div", { className: "sgrt-field" },
+                        React.createElement("label", null,
+                            React.createElement(PlaneLanding, { size: 13 }),
+                            " Landed in Singapore"),
+                        React.createElement("input", { type: "datetime-local", step: "3600", value: form.arrivalDateTime, onChange: (e) => setForm(Object.assign(Object.assign({}, form), { arrivalDateTime: e.target.value })) })),
+                    React.createElement("div", { className: "sgrt-checkbox-row" },
+                        React.createElement("input", { type: "checkbox", id: "ongoing", checked: form.ongoing, onChange: (e) => setForm(Object.assign(Object.assign({}, form), { ongoing: e.target.checked })) }),
+                        React.createElement("label", { htmlFor: "ongoing", style: { margin: 0, fontFamily: "Inter, sans-serif" } }, "Still in Singapore \u2014 no return flight yet")),
+                    !form.ongoing && (React.createElement("div", { className: "sgrt-field" },
+                        React.createElement("label", null,
+                            React.createElement(PlaneTakeoff, { size: 13 }),
+                            " Left Singapore"),
+                        React.createElement("input", { type: "datetime-local", step: "3600", value: form.departureDateTime, onChange: (e) => setForm(Object.assign(Object.assign({}, form), { departureDateTime: e.target.value })) }))))),
+                React.createElement("div", { className: "sgrt-field" },
+                    React.createElement("label", null, "Note (optional)"),
+                    React.createElement("input", { type: "text", placeholder: "e.g. SQ116 return from KL", value: form.note, onChange: (e) => setForm(Object.assign(Object.assign({}, form), { note: e.target.value })) })),
+                React.createElement("div", { className: "sgrt-btn-row" },
+                    React.createElement("button", { type: "submit", className: "sgrt-btn primary" }, editingId ? "Update stay" : "Add"),
+                    editingId && (React.createElement("button", { type: "button", className: "sgrt-btn secondary", onClick: resetForm },
+                        React.createElement(X, { size: 15 }))))),
+            React.createElement("div", { className: "sgrt-card" },
+                React.createElement("h2", null,
+                    year,
+                    " timeline"),
+                !loaded ? (React.createElement("div", { className: "sgrt-empty" }, "Loading\u2026")) : displayRows.length === 0 ? (React.createElement("div", { className: "sgrt-empty" },
+                    "No stays logged yet for ",
+                    year,
+                    ".")) : (displayRows.map((row) => {
+                    var _a;
+                    if (row.type === "away") {
+                        return (React.createElement("div", { className: "sgrt-away-row", key: row.id },
+                            "away \u00B7 ",
+                            fmt(row.from),
+                            " \u2192 ",
+                            fmt(row.to),
+                            " \u00B7 ",
+                            row.yearDays,
+                            "d"));
+                    }
+                    const t = row.trip;
+                    const span = ((_a = computeYearBuckets([t])[year]) === null || _a === void 0 ? void 0 : _a.size) || 0;
+                    return (React.createElement("div", { className: "sgrt-trip", key: t.id },
+                        React.createElement("div", null,
+                            React.createElement("div", { className: "sgrt-trip-dates" },
+                                React.createElement("div", { className: "arr" },
+                                    "\u2192 IN ",
+                                    fmt(t.arrival)),
+                                React.createElement("div", { className: "dep" },
+                                    "\u2190 OUT ",
+                                    t.departure ? fmt(t.departure) : "ongoing")),
+                            t.note && React.createElement("div", { className: "sgrt-trip-note" }, t.note)),
+                        React.createElement("div", { className: "sgrt-trip-right" },
+                            React.createElement("div", { className: "sgrt-trip-days" },
+                                span,
+                                "d"),
+                            React.createElement("button", { className: "sgrt-icon-btn", onClick: () => startEdit(t) },
+                                React.createElement(Pencil, { size: 14 })),
+                            React.createElement("button", { className: "sgrt-icon-btn", onClick: () => handleDelete(t.id) },
+                                React.createElement(Trash2, { size: 14 })))));
+                }))),
+            React.createElement("div", { className: "sgrt-footnote" },
+                "Arrival and departure days each count as a full day of presence in Singapore, even if you're only there for part of the day \u2014 so a quick weekend hop still adds two days to the count. This tracker totals unique calendar days per year using that rule. It's a planning aid, not tax advice \u2014 confirm your exact position with IRAS or a tax advisor if you're close to the line.",
+                React.createElement("br", null),
+                React.createElement("br", null),
+                "Your data lives only in this browser on this device (no account, no server). Use Export/Import below to move it to another device or to keep a backup."),
+            React.createElement("div", { className: "sgrt-footer-actions" },
+                React.createElement("button", { className: "sgrt-reset", onClick: handleExport }, "Export data"),
+                React.createElement("button", { className: "sgrt-reset", onClick: () => {
+                        setShowImport((s) => !s);
+                        setImportStatus("idle");
+                    } }, "Import data"),
+                trips.length > 0 && (React.createElement("button", { className: "sgrt-reset", onClick: () => { if (confirm("Delete all saved stays? This can't be undone."))
+                        persist([]); } }, "Clear all data"))),
+            showExport && (React.createElement("div", { className: "sgrt-export-box" },
+                React.createElement("textarea", { readOnly: true, value: exportText, onClick: (e) => e.target.select() }),
+                React.createElement("div", { className: "sgrt-export-actions" },
+                    React.createElement("span", { className: `sgrt-export-note ${copyStatus === "copied" ? "copied" : ""}` }, copyStatus === "copied" ? "Copied to clipboard ✓" : copyStatus === "manual" ? "Tap the text above, then copy manually" : "Save this somewhere safe — paste into Notes, email, etc."),
+                    React.createElement("div", { style: { display: "flex", gap: 10 } },
+                        React.createElement("button", { type: "button", className: "sgrt-reset", onClick: handleCopyAgain }, "Copy"),
+                        React.createElement("button", { type: "button", className: "sgrt-reset", onClick: () => setShowExport(false) }, "Close"))))),
+            showImport && (React.createElement("div", { className: "sgrt-export-box" },
+                React.createElement("textarea", { placeholder: "Paste a previously exported backup here\u2026", value: importText, onChange: (e) => { setImportText(e.target.value); setImportStatus("idle"); } }),
+                React.createElement("div", { className: "sgrt-export-actions" },
+                    React.createElement("span", { className: `sgrt-export-note ${importStatus === "success" ? "copied" : importStatus === "error" ? "error" : ""}` }, importStatus === "success"
+                        ? "Restored ✓ — merged with what was already here"
+                        : importStatus === "error"
+                            ? "Couldn't read that — paste the full exported text"
+                            : "Merges by stay — won't duplicate ones already saved here"),
+                    React.createElement("div", { style: { display: "flex", gap: 10 } },
+                        React.createElement("button", { type: "button", className: "sgrt-reset", onClick: handleImport }, "Restore"),
+                        React.createElement("button", { type: "button", className: "sgrt-reset", onClick: () => setShowImport(false) }, "Close"))))))));
+}
+try {
+    ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(SGResidencyTracker, null));
+}
+catch (e) {
+    sgrtShowError("Render error: " + (e && e.message ? e.message : e));
+}
+};
+// In case React/ReactDOM finished loading before this script even ran
+// (e.g. served from cache), don't wait for the bootstrap's callback.
+if (window.React && window.ReactDOM) window.__sgrtMain();
+
+</script>
+</body>
+</html>
