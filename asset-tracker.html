@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>자산 트래커 · Asset Tracker</title>
+<style>
+  :root{
+    --ink:#1c2b2a;
+    --paper:#f6f3ec;
+    --paper-2:#eeeadf;
+    --line:#d8d2c2;
+    --won:#2f6f5e;
+    --won-deep:#1d4b3e;
+    --sgd:#b8622f;
+    --myr:#8a5aa8;
+    --usd:#3a6ea5;
+    --danger:#b3422f;
+    --muted:#7a7266;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Iowan Old Style','Georgia','Noto Serif KR',serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  .util{font-family:'Menlo','Consolas',monospace;}
+
+  header{
+    padding:2.2rem 1.5rem 1.4rem;
+    border-bottom:2px solid var(--ink);
+    background:
+      repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(28,43,42,0.05) 39px, rgba(28,43,42,0.05) 40px);
+  }
+  header .eyebrow{
+    font-family:'Menlo',monospace;
+    font-size:0.7rem;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    color:var(--won-deep);
+    margin:0 0 0.35rem;
+  }
+  header h1{
+    margin:0;
+    font-size:1.9rem;
+    font-weight:600;
+    letter-spacing:-0.01em;
+  }
+  header .sub{
+    margin:0.3rem 0 0;
+    color:var(--muted);
+    font-size:0.92rem;
+  }
+
+  main{
+    max-width:760px;
+    margin:0 auto;
+    padding:1.5rem 1.2rem 4rem;
+  }
+
+  .rates{
+    display:flex;
+    gap:0.6rem;
+    flex-wrap:wrap;
+    margin-bottom:1.6rem;
+  }
+  .rate-chip{
+    font-family:'Menlo',monospace;
+    font-size:0.78rem;
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:100px;
+    padding:0.35rem 0.75rem;
+    color:var(--ink);
+  }
+  .rate-chip b{font-weight:700;}
+  .rate-chip.rm b{color:var(--myr);}
+  .rate-chip.sgd b{color:var(--sgd);}
+  .rate-chip.usd b{color:var(--usd);}
+  .rates-edit-btn{
+    font-family:'Menlo',monospace;
+    font-size:0.75rem;
+    border:1px dashed var(--line);
+    background:transparent;
+    border-radius:100px;
+    padding:0.35rem 0.75rem;
+    color:var(--muted);
+    cursor:pointer;
+  }
+  .rates-edit-btn:hover{border-color:var(--ink);color:var(--ink);}
+
+  .rates-editor{
+    display:none;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:1rem;
+    margin-bottom:1.6rem;
+    gap:0.7rem;
+    flex-wrap:wrap;
+  }
+  .rates-editor.open{display:flex;}
+  .rates-editor label{
+    display:flex;
+    flex-direction:column;
+    font-size:0.72rem;
+    color:var(--muted);
+    gap:0.25rem;
+  }
+  .rates-editor input{
+    font-family:'Menlo',monospace;
+    font-size:0.85rem;
+    padding:0.4rem 0.5rem;
+    border:1px solid var(--line);
+    border-radius:6px;
+    width:100px;
+  }
+
+  .month-nav{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:0.9rem 1.1rem;
+    margin-bottom:1.4rem;
+  }
+  .month-nav button{
+    background:var(--ink);
+    color:var(--paper);
+    border:none;
+    width:2rem;
+    height:2rem;
+    border-radius:50%;
+    font-size:1rem;
+    cursor:pointer;
+    line-height:1;
+  }
+  .month-nav button:hover{background:var(--won-deep);}
+  .month-label{
+    font-size:1.15rem;
+    font-weight:600;
+    letter-spacing:0.01em;
+  }
+  .month-label .yr{color:var(--muted);font-size:0.85rem;font-weight:400;margin-left:0.3rem;}
+
+  .total-card{
+    background:var(--ink);
+    color:var(--paper);
+    border-radius:14px;
+    padding:1.5rem 1.4rem;
+    margin-bottom:1.6rem;
+    position:relative;
+    overflow:hidden;
+  }
+  .total-card::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:repeating-linear-gradient(135deg, transparent, transparent 22px, rgba(246,243,236,0.03) 22px, rgba(246,243,236,0.03) 23px);
+  }
+  .total-card .label{
+    font-family:'Menlo',monospace;
+    font-size:0.72rem;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:#b9d4c8;
+    margin:0 0 0.4rem;
+    position:relative;
+  }
+  .total-card .amount{
+    font-size:2.3rem;
+    font-weight:700;
+    letter-spacing:-0.01em;
+    position:relative;
+  }
+  .total-card .amount .won-mark{font-size:1.4rem;opacity:0.6;margin-right:0.15rem;}
+  .total-card .delta{
+    margin-top:0.5rem;
+    font-size:0.85rem;
+    position:relative;
+    color:#cfe3d9;
+  }
+  .total-card .delta.up{color:#8fd6b0;}
+  .total-card .delta.down{color:#e3a08f;}
+
+  .section-title{
+    font-family:'Menlo',monospace;
+    font-size:0.72rem;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin:0 0 0.7rem;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+
+  .assets-list{
+    display:flex;
+    flex-direction:column;
+    gap:0.6rem;
+    margin-bottom:1rem;
+  }
+  .asset-row{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:0.7rem 0.8rem;
+    display:grid;
+    grid-template-columns:1fr 90px 110px 90px auto;
+    gap:0.5rem;
+    align-items:center;
+  }
+  .asset-row input, .asset-row select{
+    font-family:inherit;
+    font-size:0.9rem;
+    padding:0.4rem 0.5rem;
+    border:1px solid var(--line);
+    border-radius:6px;
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+  }
+  .asset-row input[type="number"]{
+    font-family:'Menlo',monospace;
+    text-align:right;
+  }
+  .asset-row .krw-preview{
+    font-family:'Menlo',monospace;
+    font-size:0.8rem;
+    color:var(--muted);
+    text-align:right;
+    white-space:nowrap;
+  }
+  .asset-row .del-btn{
+    background:none;
+    border:none;
+    color:var(--danger);
+    font-size:1.1rem;
+    cursor:pointer;
+    padding:0.2rem 0.4rem;
+    opacity:0.5;
+  }
+  .asset-row .del-btn:hover{opacity:1;}
+
+  select.currency-KRW{border-left:3px solid var(--won);}
+  select.currency-SGD{border-left:3px solid var(--sgd);}
+  select.currency-MYR{border-left:3px solid var(--myr);}
+  select.currency-USD{border-left:3px solid var(--usd);}
+
+  .add-row-btn{
+    width:100%;
+    padding:0.7rem;
+    background:transparent;
+    border:1.5px dashed var(--line);
+    border-radius:10px;
+    color:var(--muted);
+    font-family:inherit;
+    font-size:0.9rem;
+    cursor:pointer;
+    margin-bottom:2rem;
+  }
+  .add-row-btn:hover{border-color:var(--won-deep);color:var(--won-deep);}
+
+  .breakdown{
+    display:flex;
+    gap:0.5rem;
+    margin-bottom:2rem;
+    flex-wrap:wrap;
+  }
+  .bd-chip{
+    flex:1;
+    min-width:130px;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:0.7rem 0.8rem;
+  }
+  .bd-chip .cur{font-family:'Menlo',monospace;font-size:0.7rem;letter-spacing:0.1em;color:var(--muted);}
+  .bd-chip .val{font-size:1.05rem;font-weight:600;margin-top:0.2rem;}
+  .bd-chip.KRW .cur{color:var(--won);}
+  .bd-chip.SGD .cur{color:var(--sgd);}
+  .bd-chip.MYR .cur{color:var(--myr);}
+  .bd-chip.USD .cur{color:var(--usd);}
+
+  .chart-card{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:1.2rem 1rem 0.6rem;
+    margin-bottom:2rem;
+  }
+  .chart-card h2{
+    font-size:0.95rem;
+    margin:0 0 0.9rem;
+    font-weight:600;
+  }
+  #chartSvg{width:100%;height:auto;display:block;}
+  .chart-empty{
+    color:var(--muted);
+    font-size:0.85rem;
+    text-align:center;
+    padding:2rem 0;
+  }
+
+  .footer-note{
+    font-size:0.78rem;
+    color:var(--muted);
+    text-align:center;
+    line-height:1.6;
+  }
+
+  @media (max-width:520px){
+    .asset-row{grid-template-columns:1fr 1fr;grid-template-areas:"name name" "amount cur" "krw del";}
+    .asset-row input[name="name"]{grid-area:name;}
+    .asset-row input[type="number"]{grid-area:amount;}
+    .asset-row select{grid-area:cur;}
+    .asset-row .krw-preview{grid-area:krw;}
+    .asset-row .del-btn{grid-area:del;justify-self:end;}
+    header h1{font-size:1.5rem;}
+    .total-card .amount{font-size:1.8rem;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <p class="eyebrow">Monthly · 월별 자산 현황</p>
+  <h1>자산 트래커</h1>
+  <p class="sub">Track every account across SGD · MYR · USD · KRW — see it all in one number.</p>
+</header>
+
+<main>
+
+  <div class="rates">
+    <span class="rate-chip rm">RM 1 = <b id="rateDisplayMYR">370</b> ₩</span>
+    <span class="rate-chip sgd">S$1 = <b id="rateDisplaySGD">1150</b> ₩</span>
+    <span class="rate-chip usd">$1 = <b id="rateDisplayUSD">1400</b> ₩</span>
+    <button class="rates-edit-btn" id="rateEditToggle">edit rates</button>
+  </div>
+
+  <div class="rates-editor" id="ratesEditor">
+    <label>MYR→KRW <input type="number" id="inputRateMYR" value="370"></label>
+    <label>SGD→KRW <input type="number" id="inputRateSGD" value="1150"></label>
+    <label>USD→KRW <input type="number" id="inputRateUSD" value="1400"></label>
+  </div>
+
+  <div class="month-nav">
+    <button id="prevMonth">‹</button>
+    <div class="month-label"><span id="monthName">July</span><span class="yr" id="yearName">2026</span></div>
+    <button id="nextMonth">›</button>
+  </div>
+
+  <div class="total-card">
+    <p class="label">Total assets, this month</p>
+    <div class="amount"><span class="won-mark">₩</span><span id="totalKRW">0</span></div>
+    <div class="delta" id="deltaText"></div>
+  </div>
+
+  <p class="section-title">Currency breakdown</p>
+  <div class="breakdown" id="breakdownRow"></div>
+
+  <p class="section-title">Asset items</p>
+  <div class="assets-list" id="assetsList"></div>
+  <button class="add-row-btn" id="addRowBtn">+ Add asset item</button>
+
+  <div class="chart-card">
+    <h2>Total assets over time (KRW)</h2>
+    <div id="chartContainer"></div>
+  </div>
+
+  <p class="footer-note">Data is saved locally in this browser only.<br>Rates: MYR/SGD/USD → KRW, edited manually above.</p>
+
+</main>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'asset_tracker_v1';
+  const RATES_KEY = 'asset_tracker_rates_v1';
+
+  const CUR_ORDER = ['KRW','SGD','MYR','USD'];
+
+  function loadData(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    }catch(e){ return {}; }
+  }
+  function saveData(data){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }
+  function loadRates(){
+    try{
+      const raw = localStorage.getItem(RATES_KEY);
+      return raw ? JSON.parse(raw) : {MYR:370, SGD:1150, USD:1400};
+    }catch(e){ return {MYR:370, SGD:1150, USD:1400}; }
+  }
+  function saveRates(r){
+    localStorage.setItem(RATES_KEY, JSON.stringify(r));
+  }
+
+  let rates = loadRates();
+  let data = loadData(); // { "2026-07": [{name, amount, currency}, ...], ... }
+
+  const now = new Date();
+  let viewYear = now.getFullYear();
+  let viewMonth = now.getMonth(); // 0-indexed
+
+  function monthKey(y,m){
+    return y + '-' + String(m+1).padStart(2,'0');
+  }
+
+  function toKRW(amount, currency){
+    if(currency === 'KRW') return amount;
+    if(currency === 'MYR') return amount * rates.MYR;
+    if(currency === 'SGD') return amount * rates.SGD;
+    if(currency === 'USD') return amount * rates.USD;
+    return amount;
+  }
+
+  function fmt(n){
+    return Math.round(n).toLocaleString('en-US');
+  }
+
+  function findMostRecentPriorMonth(y, m){
+    // Search backwards for the closest month key (chronologically before y-m) that has items
+    const keys = Object.keys(data).filter(k => data[k] && data[k].length > 0);
+    const targetKey = monthKey(y,m);
+    const priorKeys = keys.filter(k => k < targetKey).sort();
+    if(priorKeys.length === 0) return null;
+    return priorKeys[priorKeys.length - 1];
+  }
+
+  function getMonthItems(){
+    const key = monthKey(viewYear, viewMonth);
+    if(!data[key]){
+      // New/unvisited month: carry forward items + balances from the most recent prior month with data
+      const priorKey = findMostRecentPriorMonth(viewYear, viewMonth);
+      if(priorKey){
+        data[key] = data[priorKey].map(it => ({
+          name: it.name,
+          amount: it.amount,
+          currency: it.currency
+        }));
+      } else {
+        data[key] = [];
+      }
+      saveData(data);
+    }
+    return data[key];
+  }
+
+  function ensureAtLeastOneRow(){
+    const items = getMonthItems();
+    if(items.length === 0){
+      items.push({name:'', amount:'', currency:'KRW'});
+    }
+  }
+
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  function renderRatesDisplay(){
+    document.getElementById('rateDisplayMYR').textContent = rates.MYR;
+    document.getElementById('rateDisplaySGD').textContent = rates.SGD;
+    document.getElementById('rateDisplayUSD').textContent = rates.USD;
+    document.getElementById('inputRateMYR').value = rates.MYR;
+    document.getElementById('inputRateSGD').value = rates.SGD;
+    document.getElementById('inputRateUSD').value = rates.USD;
+  }
+
+  function renderMonthNav(){
+    document.getElementById('monthName').textContent = monthNames[viewMonth];
+    document.getElementById('yearName').textContent = viewYear;
+  }
+
+  function renderAssetsList(){
+    const list = document.getElementById('assetsList');
+    const items = getMonthItems();
+    list.innerHTML = '';
+    items.forEach((item, idx) => {
+      const row = document.createElement('div');
+      row.className = 'asset-row';
+
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.name = 'name';
+      nameInput.placeholder = 'e.g. DBS Savings';
+      nameInput.value = item.name || '';
+      nameInput.addEventListener('input', e => {
+        items[idx].name = e.target.value;
+        saveData(data);
+      });
+
+      const amountInput = document.createElement('input');
+      amountInput.type = 'number';
+      amountInput.placeholder = '0';
+      amountInput.value = item.amount === '' ? '' : item.amount;
+      amountInput.step = 'any';
+      amountInput.addEventListener('input', e => {
+        items[idx].amount = e.target.value === '' ? '' : parseFloat(e.target.value);
+        saveData(data);
+        renderTotals();
+        renderKrwPreview(row, items[idx]);
+        renderChart();
+      });
+
+      const curSelect = document.createElement('select');
+      curSelect.className = 'currency-' + (item.currency || 'KRW');
+      ['KRW','SGD','MYR','USD'].forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c; opt.textContent = c;
+        if((item.currency||'KRW') === c) opt.selected = true;
+        curSelect.appendChild(opt);
+      });
+      curSelect.addEventListener('change', e => {
+        items[idx].currency = e.target.value;
+        curSelect.className = 'currency-' + e.target.value;
+        saveData(data);
+        renderTotals();
+        renderKrwPreview(row, items[idx]);
+        renderChart();
+      });
+
+      const krwPreview = document.createElement('div');
+      krwPreview.className = 'krw-preview';
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'del-btn';
+      delBtn.innerHTML = '✕';
+      delBtn.title = 'Remove item';
+      delBtn.addEventListener('click', () => {
+        items.splice(idx,1);
+        saveData(data);
+        renderAll();
+      });
+
+      row.appendChild(nameInput);
+      row.appendChild(amountInput);
+      row.appendChild(curSelect);
+      row.appendChild(krwPreview);
+      row.appendChild(delBtn);
+      list.appendChild(row);
+
+      renderKrwPreview(row, item);
+    });
+  }
+
+  function renderKrwPreview(row, item){
+    const preview = row.querySelector('.krw-preview');
+    const amt = parseFloat(item.amount);
+    if(isNaN(amt) || amt === 0){
+      preview.textContent = '';
+      return;
+    }
+    if(item.currency === 'KRW'){
+      preview.textContent = '';
+    } else {
+      preview.textContent = '≈ ₩' + fmt(toKRW(amt, item.currency));
+    }
+  }
+
+  function computeMonthTotal(y,m){
+    const key = monthKey(y,m);
+    const items = data[key] || [];
+    let total = 0;
+    items.forEach(it => {
+      const amt = parseFloat(it.amount);
+      if(!isNaN(amt)) total += toKRW(amt, it.currency || 'KRW');
+    });
+    return total;
+  }
+
+  function computeBreakdown(){
+    const items = getMonthItems();
+    const bd = {KRW:0, SGD:0, MYR:0, USD:0};
+    items.forEach(it => {
+      const amt = parseFloat(it.amount);
+      if(!isNaN(amt)){
+        bd[it.currency || 'KRW'] += amt;
+      }
+    });
+    return bd;
+  }
+
+  function renderBreakdown(){
+    const row = document.getElementById('breakdownRow');
+    row.innerHTML = '';
+    const bd = computeBreakdown();
+    CUR_ORDER.forEach(cur => {
+      if(bd[cur] === 0) return;
+      const chip = document.createElement('div');
+      chip.className = 'bd-chip ' + cur;
+      const symbol = {KRW:'₩', SGD:'S$', MYR:'RM', USD:'$'}[cur];
+      chip.innerHTML = `<div class="cur">${cur}</div><div class="val">${symbol}${fmt(bd[cur])}</div>`;
+      row.appendChild(chip);
+    });
+    if(row.innerHTML === ''){
+      row.innerHTML = '<div class="bd-chip" style="color:var(--muted);font-size:0.85rem;">No amounts entered yet</div>';
+    }
+  }
+
+  function renderTotals(){
+    const total = computeMonthTotal(viewYear, viewMonth);
+    document.getElementById('totalKRW').textContent = fmt(total);
+
+    // delta vs previous month
+    let prevY = viewYear, prevM = viewMonth - 1;
+    if(prevM < 0){ prevM = 11; prevY -= 1; }
+    const prevKey = monthKey(prevY, prevM);
+    const deltaEl = document.getElementById('deltaText');
+    if(data[prevKey] && data[prevKey].length > 0){
+      const prevTotal = computeMonthTotal(prevY, prevM);
+      const diff = total - prevTotal;
+      const pct = prevTotal !== 0 ? (diff/prevTotal*100) : 0;
+      const sign = diff >= 0 ? '+' : '';
+      deltaEl.textContent = `${sign}₩${fmt(diff)} (${sign}${pct.toFixed(1)}%) vs ${monthNames[prevM]}`;
+      deltaEl.className = 'delta ' + (diff > 0 ? 'up' : diff < 0 ? 'down' : '');
+    } else {
+      deltaEl.textContent = 'No prior month data to compare';
+      deltaEl.className = 'delta';
+    }
+    renderBreakdown();
+  }
+
+  function renderChart(){
+    const container = document.getElementById('chartContainer');
+    // gather all months with data, sorted chronologically, last 24
+    const keys = Object.keys(data).filter(k => data[k].some(it => it.amount !== '' && !isNaN(parseFloat(it.amount))));
+    keys.sort();
+    const recentKeys = keys.slice(-24);
+
+    if(recentKeys.length === 0){
+      container.innerHTML = '<div class="chart-empty">Add asset amounts to see your trend here.</div>';
+      return;
+    }
+
+    const points = recentKeys.map(k => {
+      const [y,m] = k.split('-').map(Number);
+      return { key:k, y, m: m-1, total: computeMonthTotal(y, m-1) };
+    });
+
+    const W = 680, H = 260, padL = 70, padR = 20, padT = 20, padB = 40;
+    const innerW = W - padL - padR;
+    const innerH = H - padT - padB;
+
+    const maxVal = Math.max(...points.map(p=>p.total), 1);
+    const minVal = Math.min(0, Math.min(...points.map(p=>p.total)));
+    const range = (maxVal - minVal) || 1;
+
+    const xStep = points.length > 1 ? innerW / (points.length - 1) : 0;
+
+    function xFor(i){ return padL + i * xStep; }
+    function yFor(v){ return padT + innerH - ((v - minVal)/range) * innerH; }
+
+    let pathD = '';
+    points.forEach((p,i) => {
+      const x = xFor(i), y = yFor(p.total);
+      pathD += (i===0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+    });
+
+    // area fill path
+    let areaD = pathD + `L${xFor(points.length-1).toFixed(1)},${(padT+innerH).toFixed(1)} L${xFor(0).toFixed(1)},${(padT+innerH).toFixed(1)} Z`;
+
+    // gridlines (4 horizontal)
+    let gridLines = '';
+    let gridLabels = '';
+    const gridCount = 4;
+    for(let g=0; g<=gridCount; g++){
+      const val = minVal + (range * g/gridCount);
+      const y = yFor(val);
+      gridLines += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="#d8d2c2" stroke-width="1" stroke-dasharray="2,3"/>`;
+      gridLabels += `<text x="${padL-8}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="10" font-family="Menlo,monospace" fill="#7a7266">₩${(val/1e6).toFixed(1)}M</text>`;
+    }
+
+    let dots = '';
+    let labels = '';
+    points.forEach((p,i) => {
+      const x = xFor(i), y = yFor(p.total);
+      dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="#1d4b3e" stroke="#f6f3ec" stroke-width="1.5"/>`;
+      if(points.length <= 12 || i % Math.ceil(points.length/12) === 0 || i === points.length-1){
+        const shortLabel = monthNames[p.m].slice(0,3) + " '" + String(p.y).slice(2);
+        labels += `<text x="${x.toFixed(1)}" y="${H-14}" text-anchor="middle" font-size="10" font-family="Menlo,monospace" fill="#7a7266">${shortLabel}</text>`;
+      }
+    });
+
+    const svg = `
+      <svg id="chartSvg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#2f6f5e" stop-opacity="0.25"/>
+            <stop offset="100%" stop-color="#2f6f5e" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        ${gridLines}
+        ${gridLabels}
+        <path d="${areaD}" fill="url(#areaGrad)"/>
+        <path d="${pathD}" fill="none" stroke="#1d4b3e" stroke-width="2.2"/>
+        ${dots}
+        ${labels}
+      </svg>
+    `;
+    container.innerHTML = svg;
+  }
+
+  function renderAll(){
+    ensureAtLeastOneRow();
+    renderMonthNav();
+    renderAssetsList();
+    renderTotals();
+    renderChart();
+  }
+
+  // event bindings
+  document.getElementById('prevMonth').addEventListener('click', () => {
+    viewMonth -= 1;
+    if(viewMonth < 0){ viewMonth = 11; viewYear -= 1; }
+    renderAll();
+  });
+  document.getElementById('nextMonth').addEventListener('click', () => {
+    viewMonth += 1;
+    if(viewMonth > 11){ viewMonth = 0; viewYear += 1; }
+    renderAll();
+  });
+  document.getElementById('addRowBtn').addEventListener('click', () => {
+    getMonthItems().push({name:'', amount:'', currency:'KRW'});
+    saveData(data);
+    renderAssetsList();
+    renderTotals();
+  });
+
+  document.getElementById('rateEditToggle').addEventListener('click', () => {
+    document.getElementById('ratesEditor').classList.toggle('open');
+  });
+  ['MYR','SGD','USD'].forEach(cur => {
+    document.getElementById('inputRate'+cur).addEventListener('input', e => {
+      const val = parseFloat(e.target.value);
+      if(!isNaN(val) && val > 0){
+        rates[cur] = val;
+        saveRates(rates);
+        renderRatesDisplay();
+        renderAssetsList();
+        renderTotals();
+        renderChart();
+      }
+    });
+  });
+
+  renderRatesDisplay();
+  renderAll();
+})();
+</script>
+
+</body>
+</html>
